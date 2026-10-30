@@ -168,4 +168,59 @@ internal static class AdminSql
         	AND t.ToolKey = @ToolKey
         	AND p.PermissionName = N'admin';                                    
         """;
+    
+    public const string CountActiveAdmins = """
+	    SELECT COUNT(DISTINCT u.UserId)
+	    FROM auth.Users u
+	    JOIN auth.UserRoles ur ON ur.UserId = u.UserId
+	    JOIN auth.RolePermissions rp ON rp.RoleId = ur.RoleId
+	    JOIN auth.Permissions p ON p.PermissionId = rp.PermissionId
+	    JOIN auth.Tools t ON t.ToolId = p.ToolId
+	    WHERE u.IsActive = 1
+	      AND t.IsActive = 1
+	      AND t.ToolKey = @ToolKey
+	      AND p.PermissionName = N'Admin';
+	    """;
+
+	public const string CountActiveAdminsAfterRoleRemoval = """
+	    SELECT COUNT(DISTINCT u.UserId)
+	    FROM auth.Users u
+	    JOIN auth.UserRoles ur ON ur.UserId = u.UserId
+	    JOIN auth.RolePermissions rp ON rp.RoleId = ur.RoleId
+	    JOIN auth.Permissions p ON p.PermissionId = rp.PermissionId
+	    JOIN auth.Tools t ON t.ToolId = p.ToolId
+	    WHERE u.IsActive = 1
+	      AND t.IsActive = 1
+	      AND t.ToolKey = @ToolKey
+	      AND p.PermissionName = N'Admin'
+	      AND NOT (ur.UserId = @UserId AND ur.RoleId = @RoleId);
+	    """;
+
+	public const string CountActiveAdminsAfterPermissionRevocation = """
+	    SELECT COUNT(DISTINCT u.UserId)
+	    FROM auth.Users u
+	    JOIN auth.UserRoles ur ON ur.UserId = u.UserId
+	    JOIN auth.RolePermissions rp ON rp.RoleId = ur.RoleId
+	    JOIN auth.Permissions p ON p.PermissionId = rp.PermissionId
+	    JOIN auth.Tools t ON t.ToolId = p.ToolId
+	    WHERE u.IsActive = 1
+	      AND t.IsActive = 1
+	      AND t.ToolKey = @ToolKey
+	      AND p.PermissionName = N'Admin'
+	      AND NOT (rp.RoleId = @RoleId AND rp.PermissionId = @PermissionId);
+	    """;
+
+	public const string CountActiveAdminsAfterDeactivation = """
+	    SELECT COUNT(DISTINCT u.UserId)
+	    FROM auth.Users u
+	    JOIN auth.UserRoles ur ON ur.UserId = u.UserId
+	    JOIN auth.RolePermissions rp ON rp.RoleId = ur.RoleId
+	    JOIN auth.Permissions p ON p.PermissionId = rp.PermissionId
+	    JOIN auth.Tools t ON t.ToolId = p.ToolId
+	    WHERE u.IsActive = 1
+	      AND u.UserId <> @UserId
+	      AND t.IsActive = 1
+	      AND t.ToolKey = @ToolKey
+	      AND p.PermissionName = N'Admin';
+	    """;
 }

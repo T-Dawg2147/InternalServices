@@ -192,6 +192,11 @@ internal sealed class AdminService : IAdminService
     {
         await using var conn = await _connections.OpenAsync(ct);
 
+        await EnsureAnActiveAdminRemainsAsync(
+            conn, AdminSql.CountActiveAdminsAfterRoleRemoval,
+            new { UserId = userId, RoleId = roleId, ToolKey = _options.ToolKey },
+            ct);
+
         if (actorUserId == userId)
         {
             var before = await CountAdminAccessAsync(conn, userId, -1, -1, ct);
@@ -225,6 +230,12 @@ internal sealed class AdminService : IAdminService
     {
         await using var conn = await _connections.OpenAsync(ct);
         
+        await EnsureAnActiveAdminRemainsAsync(
+            conn,
+            AdminSql.CountActiveAdminsAfterPermissionRevocation,
+            new { RoleId = roleId, PermissionId = permissionId, ToolKey = _options.ToolKey },
+            ct);
+        
         if (actorUserId is int actor)
         {
             var before = await CountAdminAccessAsync(conn, actor, -1, -1, ct);
@@ -247,6 +258,15 @@ internal sealed class AdminService : IAdminService
             throw new InvalidOperationException("You can't deactivate you own account.");
         
         await using var conn = await _connections.OpenAsync(ct);
+        
+        if (!isActive)
+        {
+            await EnsureAnActiveAdminRemainsAsync(
+                conn,
+                AdminSql.CountActiveAdminsAfterDeactivation,
+                new { UserId = userId, ToolKey = _options.ToolKey },
+                ct);
+        }
         
         await conn.ExecuteAsync(new CommandDefinition(
             AdminSql.SetUserActive,
@@ -296,6 +316,29 @@ internal sealed class AdminService : IAdminService
         return await conn.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
             AdminSql.GetToolByToolKey,
             new { ToolKey = _options.ToolKey }));
+    }
+
+    private async Task EnsureAnActiveAdminRemainsAsync(
+        DbConnection conn,
+        string afterChangeSql,
+        object afterChangeParameters,
+        CancellationToken ct)
+    {
+        var before = await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+            AdminSql.CountActiveAdmins,
+            new { ToolKey = _options.ToolKey },
+            cancellationToken: ct));
+
+        var after = await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+            afterChangeSql,
+            afterChangeParameters,
+            cancellationToken: ct));
+
+        if (before > 0 && after == 0)
+        {
+            throw new InvalidOperationException(
+                "This change would remove the last active user with Admin access to this tool.");
+        }
     }
 
     private async Task InvalidateUserCacheAsync(DbConnection conn, int userId, CancellationToken ct)

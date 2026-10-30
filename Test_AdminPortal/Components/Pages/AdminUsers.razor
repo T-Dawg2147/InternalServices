@@ -99,10 +99,10 @@
     private bool _isError;
     private string _search = string.Empty;
 
-    private List<UserSummary> _users = new();
-    private List<RoleSummary> _roles = new();
+    private List<UserSummary> _users = [];
+    private List<RoleSummary> _roles = [];
     private UserSummary? _selectedUser;
-    private HashSet<int> _selectedUserRoleIds = new();
+    private HashSet<int> _selectedUserRoleIds = [];
     private string _newRoleName = string.Empty;
 
     private IEnumerable<UserSummary> FilteredUsers =>

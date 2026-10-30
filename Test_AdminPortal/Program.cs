@@ -12,7 +12,8 @@ builder.Services.AddInternalAuthWeb(
     o =>
     {
         o.ToolKey = "admin-portal";
-        o.ConnectionString = builder.Configuration.GetConnectionString("InternalServices");
+        o.ConnectionString = builder.Configuration.GetConnectionString("InternalServices") 
+                             ?? throw new ArgumentException("Connection string missing or invalid.");
         o.PermissionCacheMinutes = 5;
     },
     useDevelopmentAuth: useDevAuth);

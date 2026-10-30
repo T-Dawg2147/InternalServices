@@ -8,5 +8,5 @@ public sealed record UserSummary(
     string FirstName,
     string LastName,
     bool IsActive,
-    DateTime CreateAt,
+    DateTime CreatedAt,
     DateTime? LastLoginAt);

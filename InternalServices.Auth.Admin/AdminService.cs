@@ -49,21 +49,23 @@ internal sealed class AdminService : IAdminService
     public async Task<IReadOnlyList<PermissionSummary>> GetPermissionsAsync(CancellationToken ct = default)
     {
         await using var conn = await _connections.OpenAsync(ct);
-        var cmd = new CommandDefinition(AdminSql.GetPermissions , cancellationToken: ct);
+        var cmd = new CommandDefinition(AdminSql.GetPermissions, cancellationToken: ct);
         return (await conn.QueryAsync<PermissionSummary>(cmd)).ToList();
     }
 
     public async Task<IReadOnlyList<int>> GetUserRoleIdsAsync(int userId, CancellationToken ct = default)
     {
         await using var conn = await _connections.OpenAsync(ct);
-        var cmd = new CommandDefinition(AdminSql.GetUserRoleIds , cancellationToken: ct);
+        var cmd = new CommandDefinition(AdminSql.GetUserRoleIds,
+            new { UserId = userId }, cancellationToken: ct);
         return (await conn.QueryAsync<int>(cmd)).ToList();
     }
 
     public async Task<IReadOnlyList<int>> GetRolePermissionIdsAsync(int roleId, CancellationToken ct = default)
     {
         await using var conn = await _connections.OpenAsync(ct);
-        var cmd = new CommandDefinition(AdminSql.GetRolePermissionIds , cancellationToken: ct);
+        var cmd = new CommandDefinition(AdminSql.GetRolePermissionIds, 
+            new { RoleId = roleId }, cancellationToken: ct);
         return (await conn.QueryAsync<int>(cmd)).ToList();
     }
 
@@ -189,6 +191,14 @@ internal sealed class AdminService : IAdminService
     public async Task RemoveRoleFromUserAsync(int userId, int roleId, int? actorUserId, CancellationToken ct = default)
     {
         await using var conn = await _connections.OpenAsync(ct);
+
+        if (actorUserId == userId)
+        {
+            var before = await CountAdminAccessAsync(conn, userId, -1, -1, ct);
+            var after = await CountAdminAccessAsync(conn, userId, roleId, null, ct);
+            if (before > 0 && after == 0)
+                throw new InvalidOperationException("You can't remove the role that gives you Admin access.");
+        }
         
         await conn.ExecuteAsync(new CommandDefinition(
             AdminSql.RemoveRoleFromUser,
@@ -209,13 +219,19 @@ internal sealed class AdminService : IAdminService
             cancellationToken: ct));
 
         await WriteAuditAsync(conn, actorUserId, "RolePermissionGranted", $"RoleId={roleId};PermissionId={permissionId}", ct);
-        // NOTE: existing in-memory caches for users with this role are not immediately invalidated cross-user.
-        // They naturally refresh on expiry (PermissionCacheMinutes).
     }
 
     public async Task RevokePermissionFromRoleAsync(int roleId, int permissionId, int? actorUserId, CancellationToken ct = default)
     {
         await using var conn = await _connections.OpenAsync(ct);
+        
+        if (actorUserId is int actor)
+        {
+            var before = await CountAdminAccessAsync(conn, actor, -1, -1, ct);
+            var after = await CountAdminAccessAsync(conn, actor, roleId, permissionId, ct);
+            if (before > 0 && after == 0)
+                throw new InvalidOperationException("You can't revoke the permission that gives you Admin access.");
+        }
         
         await conn.ExecuteAsync(new CommandDefinition(
             AdminSql.RevokePermissionFromRole,
@@ -227,6 +243,9 @@ internal sealed class AdminService : IAdminService
 
     public async Task SetUserActiveAsync(int userId, bool isActive, int? actorUserId, CancellationToken ct = default)
     {
+        if (!isActive && actorUserId == userId)
+            throw new InvalidOperationException("You can't deactivate you own account.");
+        
         await using var conn = await _connections.OpenAsync(ct);
         
         await conn.ExecuteAsync(new CommandDefinition(
@@ -288,5 +307,18 @@ internal sealed class AdminService : IAdminService
 
         if (!string.IsNullOrWhiteSpace(externalId))
             _permissionService.Invalidate(externalId);
+    }
+
+    private async Task<int> CountAdminAccessAsync(DbConnection conn, int userId, int roleId, int? permissionId,
+        CancellationToken ct)
+    {
+        var sql = permissionId is null
+            ? AdminSql.CountAdminAccessExcludingRole
+            : AdminSql.CountAdminAccessExcludingRolePermission;
+
+        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+            sql,
+            new { UserId = userId, RoleId = roleId, PermissionId = permissionId, ToolKey = _options.ToolKey },
+            cancellationToken: ct));
     }
 }

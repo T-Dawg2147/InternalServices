@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("InternalServices.Auth.Admin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3b07ee8da191fa5375d1125a9968511b734095dc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+02867ca43bb8e83f7d3437edbb8726c07ae0aae5")]
 [assembly: System.Reflection.AssemblyProductAttribute("InternalServices.Auth.Admin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("InternalServices.Auth.Admin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

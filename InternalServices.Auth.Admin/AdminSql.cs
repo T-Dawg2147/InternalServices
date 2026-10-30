@@ -3,7 +3,7 @@
 internal static class AdminSql
 {
     public const string GetUsers = """
-		SELECT UserId,ExternalId,Username, Email, FirstName, LastName, IsActive, CreatedAt, LastLoginAt
+		SELECT UserId, ExternalId, Username, Email, FirstName, LastName, IsActive, CreatedAt, LastLoginAt
 		FROM auth.Users
 		ORDER BY LastName, FirstName, UserId;
 		""";
@@ -21,9 +21,10 @@ internal static class AdminSql
 		""";
 
     public const string GetPermissions = """
-		SELECT PermissionId, ToolId, ToolKey, ToolName, PermissionName, Description
-		FROM auth.Permissions
-		ORDER BY PermissionName;
+		SELECT p.PermissionId, p.ToolId, t.ToolKey, t.ToolName, p.PermissionName, p.Description
+		FROM auth.Permissions p
+		JOIN auth.Tools t ON t.ToolId = p.ToolId
+		ORDER BY p.PermissionName;
 		""";
 
     public const string GetUserRoleIds = """
@@ -143,5 +144,28 @@ internal static class AdminSql
         LEFT JOIN auth.Users u ON u.UserId = a.UserId
         LEFT JOIN auth.Tools t ON t.ToolId = a.ToolId
         ORDER BY a.OccurredAt DESC;
+        """;
+
+    public const string CountAdminAccessExcludingRole = """
+        FROM auth.UserRoles ur
+        	JOIN auth.RolePermissions rp ON rp.RoleId = ur.RoleId
+        	JOIN auth.Permissions p on p.PermissionId = rp.PermissionId
+        	JOIN auth.Tools t on t.ToolId = p.ToolId
+        WHERE ur.UserId = @UserId
+        	AND ur.RoleId <> @RoleId
+        	AND t.ToolKey = @ToolKey
+        	AND p.PermissionName = 'admin';
+        """;
+    
+    public const string CountAdminAccessExcludingRolePermission = """
+        SELECT COUNT(*)
+        FROM auth.UserRoles ur
+        	JOIN auth.RolePermissions rp ON rp.RoleId = ur.RoleId
+        	JOIN auth.Permissions p ON p.PermissionId = rp.PermissionId
+        	JOIN auth.Tools t ON t.ToolId = p.ToolId
+        WHERE ur.UserId = @UserId
+        	AND NOT (rp.RoleId = @RoleId AND rp.PermissionId = @PermissionId)
+        	AND t.ToolKey = @ToolKey
+        	AND p.PermissionName = N'admin';                                    
         """;
 }

@@ -1,0 +1,38 @@
+﻿@using Test_AdminPortal.Services
+@inherits LayoutComponentBase
+@inject UserContext UserContext
+
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">Internal Services</div>
+        <NavMenu />
+    </aside>
+    
+    <div class="content">
+        <header class="topbar">
+            <span class="muted">Admin Portal</span>
+            <span class="user">@_displayName</span>
+        </header>
+        
+        <main class="main">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+
+    private string _displayName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _displayName = await UserContext.GetDisplayNameAsync();
+    }
+
+}

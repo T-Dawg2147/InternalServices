@@ -1,0 +1,24 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <div class="page">
+                    <h1>Not authorised</h1>
+                    <p class="muted">You are signed in, but you don't have permission to view this page.</p>
+                    <a class="btn" href="/">Back to home</a>
+                </div>
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <div class="page">
+                <h1>Page not found</h1>
+                <a class="btn" href="/">Back to home</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

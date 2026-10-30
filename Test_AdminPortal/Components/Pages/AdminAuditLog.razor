@@ -1,0 +1,99 @@
+﻿@page "/admin/audit"
+@using InternalServices.Auth.Core.Abstractions
+@using InternalServices.Auth.Core.Models.Admin
+@using InternalServices.Auth.Web
+@attribute [RequirePermission("Admin")]
+@inject IAdminService AdminService
+
+<PageTitle>Audit Log</PageTitle>
+
+<div class="page">
+    <h1>Audit Log</h1>
+    <p class="muted">The most recent 200 records administrative actions.</p>
+    
+    @if (_loading)
+    {
+        <p class="muted">Loading audit history...</p>
+    }
+    else if (_entries.Count == 0)
+    {
+        <div class="card">
+            <p class="muted">No audit entries were found.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="field">
+                <input type="text"
+                       placeholder="Search actor, tool, action or details"
+                       @bind="_search"
+                       @bind:event="oninput"/>
+            </div>
+            <div style="overflow-x:auto">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>Actor</th>
+                        <th>Tool</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var entry in FilteredEntries)
+                    {
+                        <tr style="cursor:default">
+                            <td>@entry.OccurredAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <td>@GetActor(entry)</td>
+                            <td>@(entry.ToolName ?? "-")</td>
+                            <td>@entry.Action</td>
+                            <td>@(entry.Details ?? "-")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            
+            @if (!FilteredEntries.Any())
+            {
+                <p class="muted">No entries match that search.</p>
+            }
+        </div>
+    }
+</div>
+
+
+@code {
+    private bool _loading = true;
+    private string _search = string.Empty;
+    private List<AuditLogEntry> _entries = new();
+
+    private IEnumerable<AuditLogEntry> FilteredEntries =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _entries
+            : _entries.Where(e =>
+                GetActor(e).Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                (e.ToolName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                e.Action.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                (e.Details?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _entries = (await AdminService.GetRecentAuditLogEntry()).ToList();
+        _loading = false;
+    }
+
+    private static string GetActor(AuditLogEntry entry)
+    {
+        var name = $"{entry.ActorFirstName} {entry.ActorLastName}".Trim();
+
+        if (!string.IsNullOrWhiteSpace(name))
+            return name;
+
+        return entry.ActorUsername
+               ?? entry.ActorEmail
+               ?? (entry.UserId is null ? "System" : $"User {entry.UserId}");
+    }
+}

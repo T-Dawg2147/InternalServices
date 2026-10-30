@@ -1,0 +1,60 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject Services.UserContext UserContext
+
+<PageTitle>Home</PageTitle>
+
+<div class="page">
+    <h1>Welcome, @_displayName</h1>
+    <p class="muted">Internal tools for the admin team.</p>
+
+    <div class="card">
+        <h2>Your permissions in the Admin Portal</h2>
+        @if (_permissions.Count == 0)
+        {
+            <p class="muted">
+                You can sign in, but you haven't been granted any permissions yet.
+                Ask an administrator to assign you a role.
+            </p>
+        }
+        else
+        {
+            <div class="chips">
+                @foreach (var permission in _permissions)
+                {
+                    <span class="chip">@permission</span>
+                }
+            </div>
+        }
+    </div>
+
+    <AuthorizeView Policy="perm:Admin">
+        <Authorized>
+            <div class="grid">
+                <a class="card link-card" href="admin/users">
+                    <h2>Users &amp; Roles</h2>
+                    <p class="muted">Assign roles to people and activate or deactivate accounts.</p>
+                </a>
+                <a class="card link-card" href="admin/roles">
+                    <h2>Roles &amp; Permissions</h2>
+                    <p class="muted">Choose what each role is allowed to do in each tool.</p>
+                </a>
+                <a class="card link-card" href="admin/tools">
+                    <h2>Tools &amp; Permissions</h2>
+                    <p class="muted">Register new tools and define their permissions.</p>
+                </a>
+            </div>
+        </Authorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private string _displayName = string.Empty;
+    private IReadOnlyList<string> _permissions = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _displayName = await UserContext.GetDisplayNameAsync();
+        _permissions = await UserContext.GetPermissionsAsync();
+    }
+}

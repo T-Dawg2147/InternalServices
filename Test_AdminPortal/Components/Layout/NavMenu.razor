@@ -1,0 +1,14 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+<nav class="nav">
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
+    
+    <AuthorizeView Policy="perm:Admin">
+        <Authorized>
+            <div class="nav-heading">Administration</div>
+            <NavLink class="nav-link" href="admin/users">Users &amp; Roles</NavLink>
+            <NavLink class="nav-link" href="admin/roles">Roles &amp; Permissions</NavLink>
+            <NavLink class="nav-link" href="admin/tools">Tools &amp; Permissions</NavLink>
+            <NavLink class="nav-link" href="admin/audit">Audit Log</NavLink>
+        </Authorized>
+    </AuthorizeView>
+</nav>

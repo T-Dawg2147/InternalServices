@@ -1,0 +1,181 @@
+﻿@page "/admin/roles"
+@using InternalServices.Auth.Core.Abstractions
+@using InternalServices.Auth.Core.Models.Admin
+@using InternalServices.Auth.Web
+@attribute [RequirePermission("Admin")]
+@inject IAdminService AdminService
+@inject Test_AdminPortal.Services.UserContext UserContext
+
+<PageTitle>Roles & Permissions</PageTitle>
+
+<div class="page">
+    <h1>Roles &amp; Permissions</h1>
+    <p class="muted">Choose what each role is allowed to do in each tool.</p>
+
+    @if (_loading)
+    {
+        <p class="muted">Loading...</p>
+    }
+    else
+    {
+        <div class="two-col">
+            <div>
+                <div class="card">
+                    <h2>Roles</h2>
+                    <table class="table">
+                        <thead><tr><th>Role</th></tr></thead>
+                        <tbody>
+                        @foreach (var role in _roles)
+                        {
+                            <tr class="@(_selectedRole?.RoleId == role.RoleId ? "selected" : "")"
+                                @onclick="() => SelectRoleAsync(role)">
+                                <td>@role.RoleName</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (_selectedRole is not null)
+                {
+                    <div class="card">
+                        <h2>Description</h2>
+                        <div class="field">
+                            <textarea rows="3" @bind="_selectedRoleDescription"></textarea>
+                        </div>
+                        <button class="btn small" @onclick="SaveDescriptionAsync">Save description</button>
+                    </div>
+                }
+            </div>
+
+            <div>
+                @if (_selectedRole is null)
+                {
+                    <div class="card"><p class="muted">Select a role to edit its permissions.</p></div>
+                }
+                else
+                {
+                    @foreach (var group in _permissionsByTool)
+                    {
+                        <div class="card">
+                            <h2>@group.Key.ToolName <span class="muted">(@group.Key.ToolKey)</span></h2>
+                            @foreach (var perm in group)
+                            {
+                                var permissionId = perm.PermissionId;
+                                <label class="check">
+                                    <input type="checkbox"
+                                           checked="@_selectedRolePermissionIds.Contains(permissionId)"
+                                           @onchange="e => OnPermissionToggledAsync(permissionId, (bool?)e.Value == true)" />
+                                    <span>@perm.PermissionName
+                                        @if (!string.IsNullOrWhiteSpace(perm.Description))
+                                        {
+                                            <small>@perm.Description</small>
+                                        }
+                                    </span>
+                                </label>
+                            }
+                        </div>
+                    }
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_message))
+                {
+                    <div class="alert @(_isError ? "error" : "")">@_message</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _message;
+    private bool _isError;
+
+    private List<RoleSummary> _roles = new();
+    private RoleSummary? _selectedRole;
+    private string _selectedRoleDescription = string.Empty;
+    private HashSet<int> _selectedRolePermissionIds = new();
+    private List<IGrouping<ToolGroupKey, PermissionSummary>> _permissionsByTool = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _roles = (await AdminService.GetRolesAsync()).ToList();
+        var permissions = await AdminService.GetPermissionsAsync();
+
+        _permissionsByTool = permissions
+            .GroupBy(x => new ToolGroupKey(x.ToolId, x.ToolKey, x.ToolName))
+            .OrderBy(g => g.Key.ToolName)
+            .ToList();
+
+        if (_selectedRole is not null)
+        {
+            _selectedRole = _roles.FirstOrDefault(r => r.RoleId == _selectedRole.RoleId);
+            if (_selectedRole is not null)
+            {
+                _selectedRoleDescription = _selectedRole.Description ?? string.Empty;
+                await LoadSelectedRolePermissionsAsync(_selectedRole.RoleId);
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task SelectRoleAsync(RoleSummary role)
+    {
+        _selectedRole = role;
+        _selectedRoleDescription = role.Description ?? string.Empty;
+        _message = null;
+        await LoadSelectedRolePermissionsAsync(role.RoleId);
+    }
+
+    private async Task LoadSelectedRolePermissionsAsync(int roleId)
+        => _selectedRolePermissionIds = (await AdminService.GetRolePermissionIdsAsync(roleId)).ToHashSet();
+
+    private async Task OnPermissionToggledAsync(int permissionId, bool shouldHave)
+    {
+        if (_selectedRole is null) return;
+
+        try
+        {
+            var actor = await UserContext.GetUserIdAsync();
+            if (shouldHave)
+            {
+                await AdminService.GrantPermissionToRoleAsync(_selectedRole.RoleId, permissionId, actor);
+                _selectedRolePermissionIds.Add(permissionId);
+                Show("Permission granted. Users pick it up within the cache window.");
+            }
+            else
+            {
+                await AdminService.RevokePermissionFromRoleAsync(_selectedRole.RoleId, permissionId, actor);
+                _selectedRolePermissionIds.Remove(permissionId);
+                Show("Permission revoked. Users lose it within the cache window.");
+            }
+        }
+        catch (Exception ex) { Show(ex.Message, true); }
+    }
+
+    private async Task SaveDescriptionAsync()
+    {
+        if (_selectedRole is null) return;
+
+        try
+        {
+            await AdminService.UpdateRoleDescriptionAsync(
+                _selectedRole.RoleId, _selectedRoleDescription, await UserContext.GetUserIdAsync());
+            await LoadAsync();
+            Show("Description saved.");
+        }
+        catch (Exception ex) { Show(ex.Message, true); }
+    }
+
+    private void Show(string message, bool isError = false)
+    {
+        _message = message;
+        _isError = isError;
+    }
+
+    private sealed record ToolGroupKey(int ToolId, string ToolKey, string ToolName);
+}

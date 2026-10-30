@@ -1,0 +1,202 @@
+﻿@page "/admin/users"
+@using InternalServices.Auth.Core.Abstractions
+@using InternalServices.Auth.Core.Models.Admin
+@using InternalServices.Auth.Web
+@attribute [RequirePermission("Admin")]
+@inject IAdminService AdminService
+@inject Test_AdminPortal.Services.UserContext UserContext
+
+<PageTitle>Users & Roles</PageTitle>
+
+<div class="page">
+    <h1>Users &amp; Roles</h1>
+    <p class="muted">Select a person to change their roles or active status.</p>
+
+    @if (_loading)
+    {
+        <p class="muted">Loading...</p>
+    }
+    else
+    {
+        <div class="two-col">
+            <div class="card">
+                <div class="field">
+                    <input type="text" placeholder="Search name or email" @bind="_search" @bind:event="oninput" />
+                </div>
+                <table class="table">
+                    <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @foreach (var user in FilteredUsers)
+                    {
+                        <tr class="@(_selectedUser?.UserId == user.UserId ? "selected" : "")"
+                            @onclick="() => SelectUserAsync(user)">
+                            <td>@user.FirstName @user.LastName</td>
+                            <td class="muted">@user.Email</td>
+                            <td><span class="badge @(user.IsActive ? "on" : "off")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                @if (_selectedUser is null)
+                {
+                    <div class="card"><p class="muted">Select a user to edit their roles.</p></div>
+                }
+                else
+                {
+                    <div class="card">
+                        <div class="row" style="justify-content:space-between; align-items:center;">
+                            <div>
+                                <h2 style="margin:0;">@_selectedUser.FirstName @_selectedUser.LastName</h2>
+                                <span class="muted">@_selectedUser.Email</span>
+                            </div>
+                            <button class="btn small @(_selectedUser.IsActive ? "danger" : "")" @onclick="ToggleActiveAsync">
+                                @(_selectedUser.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </div>
+
+                        <h3>Roles</h3>
+                        @foreach (var role in _roles)
+                        {
+                            var roleId = role.RoleId;
+                            <label class="check">
+                                <input type="checkbox"
+                                       checked="@_selectedUserRoleIds.Contains(roleId)"
+                                       @onchange="e => OnRoleToggledAsync(roleId, (bool?)e.Value == true)" />
+                                <span>@role.RoleName
+                                    @if (!string.IsNullOrWhiteSpace(role.Description))
+                                    {
+                                        <small>@role.Description</small>
+                                    }
+                                </span>
+                            </label>
+                        }
+                    </div>
+
+                    <div class="card">
+                        <h2>Create role</h2>
+                        <div class="row">
+                            <div class="field"><input type="text" @bind="_newRoleName" placeholder="Role name" /></div>
+                            <button class="btn" @onclick="CreateRoleAsync">Create</button>
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_message))
+                {
+                    <div class="alert @(_isError ? "error" : "")">@_message</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _message;
+    private bool _isError;
+    private string _search = string.Empty;
+
+    private List<UserSummary> _users = new();
+    private List<RoleSummary> _roles = new();
+    private UserSummary? _selectedUser;
+    private HashSet<int> _selectedUserRoleIds = new();
+    private string _newRoleName = string.Empty;
+
+    private IEnumerable<UserSummary> FilteredUsers =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _users
+            : _users.Where(u =>
+                $"{u.FirstName} {u.LastName}".Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                u.Email.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _users = (await AdminService.GetUsersAsync()).ToList();
+        _roles = (await AdminService.GetRolesAsync()).ToList();
+
+        if (_selectedUser is not null)
+        {
+            _selectedUser = _users.FirstOrDefault(x => x.UserId == _selectedUser.UserId);
+            if (_selectedUser is not null)
+                await LoadSelectedUserRolesAsync(_selectedUser.UserId);
+        }
+
+        _loading = false;
+    }
+
+    private async Task SelectUserAsync(UserSummary user)
+    {
+        _selectedUser = user;
+        _message = null;
+        await LoadSelectedUserRolesAsync(user.UserId);
+    }
+
+    private async Task LoadSelectedUserRolesAsync(int userId)
+        => _selectedUserRoleIds = (await AdminService.GetUserRoleIdsAsync(userId)).ToHashSet();
+
+    private async Task OnRoleToggledAsync(int roleId, bool shouldHaveRole)
+    {
+        if (_selectedUser is null) return;
+
+        try
+        {
+            var actor = await UserContext.GetUserIdAsync();
+            if (shouldHaveRole)
+            {
+                await AdminService.AssignRoleToUserAsync(_selectedUser.UserId, roleId, actor);
+                _selectedUserRoleIds.Add(roleId);
+                Show("Role assigned.");
+            }
+            else
+            {
+                await AdminService.RemoveRoleFromUserAsync(_selectedUser.UserId, roleId, actor);
+                _selectedUserRoleIds.Remove(roleId);
+                Show("Role removed.");
+            }
+        }
+        catch (Exception ex) { Show(ex.Message, true); }
+    }
+
+    private async Task ToggleActiveAsync()
+    {
+        if (_selectedUser is null) return;
+
+        try
+        {
+            var target = !_selectedUser.IsActive;
+            await AdminService.SetUserActiveAsync(_selectedUser.UserId, target, await UserContext.GetUserIdAsync());
+            await LoadAsync();
+            Show(target ? "User activated." : "User deactivated.");
+        }
+        catch (Exception ex) { Show(ex.Message, true); }
+    }
+
+    private async Task CreateRoleAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newRoleName))
+        {
+            Show("Role name is required.", true);
+            return;
+        }
+
+        try
+        {
+            await AdminService.CreateRoleAsync(_newRoleName.Trim(), null, await UserContext.GetUserIdAsync());
+            _newRoleName = string.Empty;
+            await LoadAsync();
+            Show("Role created.");
+        }
+        catch (Exception ex) { Show(ex.Message, true); }
+    }
+
+    private void Show(string message, bool isError = false)
+    {
+        _message = message;
+        _isError = isError;
+    }
+}

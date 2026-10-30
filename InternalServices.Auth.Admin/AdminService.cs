@@ -1,5 +1,4 @@
 ﻿using System.Data.Common;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using Dapper;
 using InternalServices.Auth.Core;
@@ -15,8 +14,7 @@ internal sealed class AdminService : IAdminService
     private readonly ISqlConnectionFactory _connections;
     private readonly IPermissionService _permissionService;
     private readonly AuthOptions _options;
-    private readonly Lazy<Task<int?>> _adminToolId;
-
+    
     public AdminService(
         ISqlConnectionFactory connections,
         IPermissionService permissionService,
@@ -25,8 +23,6 @@ internal sealed class AdminService : IAdminService
         _connections = connections;
         _permissionService = permissionService;
         _options = options;
-
-        _adminToolId = new Lazy<Task<int?>>(ResolveAdminToolIdAsync);
     }
 
     public async Task<IReadOnlyList<UserSummary>> GetUsersAsync(CancellationToken ct = default)
@@ -261,7 +257,7 @@ internal sealed class AdminService : IAdminService
         string? details,
         CancellationToken ct)
     {
-        var toolId = await _adminToolId.Value;
+        var toolId = await ResolveAdminToolIdAsync();
 
         await conn.ExecuteAsync(new CommandDefinition(
             AdminSql.InsertAudit,

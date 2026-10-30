@@ -46,7 +46,7 @@ internal static class UserSql
         
         COMMIT TRANSACTION;
         
-        SELECT @UserId AS Userd, @IsActive AS IsActive, @WasCreated AS WasCreated;
+        SELECT @UserId AS UserId, @IsActive AS IsActive, @WasCreated AS WasCreated;
         """;
     
     /// <summary>

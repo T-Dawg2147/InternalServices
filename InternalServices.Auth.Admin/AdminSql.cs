@@ -21,7 +21,7 @@ internal static class AdminSql
 		""";
 
     public const string GetPermissions = """
-		SELECT PermissionId, ToolId, PermissionName, Description
+		SELECT PermissionId, ToolId, ToolKey, ToolName, PermissionName, Description
 		FROM auth.Permissions
 		ORDER BY PermissionName;
 		""";

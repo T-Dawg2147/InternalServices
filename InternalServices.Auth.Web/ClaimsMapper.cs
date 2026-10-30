@@ -6,8 +6,8 @@ namespace InternalServices.Auth.Web;
 internal static class ClaimsMapper
 {
     // Microsoft.Identity.Web may expose the object ID under either name.
-    private const string ObjectIdLong = "https://schemas.microsoft.com/identity/claims/objectidentifier";
-    private const string ObjectIdShort = "iod";
+    private const string ObjectIdLong = "http://schemas.microsoft.com/identity/claims/objectidentifier";
+    private const string ObjectIdShort = "oid";
 
     /// <summary>
     /// Returns null if the principal has no object ID,

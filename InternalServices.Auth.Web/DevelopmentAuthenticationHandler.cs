@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,6 +20,10 @@ internal sealed class DevelopmentAuthenticationHandler : AuthenticationHandler<A
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        var env = Context.RequestServices.GetRequiredService<IHostEnvironment>();
+        if (!env.IsDevelopment())
+            return Task.FromResult(AuthenticateResult.Fail("Development auth is only available in Development."));
+        
         var externalId = Context.RequestServices
             .GetRequiredService<IConfiguration>()["DevAuth:ExternalId"];
 

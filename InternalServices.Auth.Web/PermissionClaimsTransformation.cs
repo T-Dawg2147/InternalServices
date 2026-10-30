@@ -44,7 +44,7 @@ internal sealed class PermissionClaimsTransformation : IClaimsTransformation
             foreach (var permission in result.Permissions)
                 extra.AddClaim(new Claim(PermissionClaims.Permission, permission));
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             extra.AddClaim(new Claim(PermissionClaims.Deactivated, "true"));
         }

@@ -5,6 +5,13 @@ using Test_AdminPortal.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var portalCatalog = builder.Configuration
+    .GetSection("PortalCatalogue")
+    .Get<PortalCatalogOptions>() ?? new PortalCatalogOptions();
+
+portalCatalog.Validate();
+builder.Services.AddSingleton(portalCatalog);
+
 var useDevAuth = builder.Environment.IsDevelopment();
 
 builder.Services.AddInternalAuthWeb(

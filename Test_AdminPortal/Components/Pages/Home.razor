@@ -1,60 +1,94 @@
 ﻿@page "/"
-@using Microsoft.AspNetCore.Components.Authorization
-@inject Services.UserContext UserContext
+@using Test_AdminPortal.Services
+@inject UserContext UserContext
+@inject PortalCatalogOptions Catalog
 
 <PageTitle>Home</PageTitle>
 
-<div class="page">
-    <h1>Welcome, @_displayName</h1>
-    <p class="muted">Internal tools for the admin team.</p>
+<div class="page launcher-page">
+    <header class="launcher-header">
+        <div>
+            <p class="eyebrow">INTERNAL SERVICES</p>
+            <h1>Welcome, @_displayName</h1>
+            <p class="muted">Choose a tool to get started.</p>
+        </div>
+        <span class="launcher-count">@_tools.Count available</span>
+    </header>
 
-    <div class="card">
-        <h2>Your permissions in the Admin Portal</h2>
-        @if (_permissions.Count == 0)
-        {
-            <p class="muted">
-                You can sign in, but you haven't been granted any permissions yet.
-                Ask an administrator to assign you a role.
-            </p>
-        }
-        else
-        {
-            <div class="chips">
-                @foreach (var permission in _permissions)
-                {
-                    <span class="chip">@permission</span>
-                }
-            </div>
-        }
+    <div class="launcher-toolbar">
+        <label class="sr-only" for="tool-search">Search available tools</label>
+        <input id="tool-search"
+               class="tool-search"
+               type="search"
+               placeholder="Search your tools"
+               @bind="_search"
+               @bind:event="oninput" />
     </div>
 
-    <AuthorizeView Policy="perm:Admin">
-        <Authorized>
-            <div class="grid">
-                <a class="card link-card" href="admin/users">
-                    <h2>Users &amp; Roles</h2>
-                    <p class="muted">Assign roles to people and activate or deactivate accounts.</p>
-                </a>
-                <a class="card link-card" href="admin/roles">
-                    <h2>Roles &amp; Permissions</h2>
-                    <p class="muted">Choose what each role is allowed to do in each tool.</p>
-                </a>
-                <a class="card link-card" href="admin/tools">
-                    <h2>Tools &amp; Permissions</h2>
-                    <p class="muted">Register new tools and define their permissions.</p>
-                </a>
-            </div>
-        </Authorized>
-    </AuthorizeView>
+    @if (_tools.Count == 0)
+    {
+        <section class="empty-state" aria-live="polite">
+            <span class="empty-state-mark" aria-hidden="true">—</span>
+            <h2>No tools assigned yet</h2>
+            <p class="muted">Ask an administrator to grant access to the tools you need.</p>
+        </section>
+    }
+    else if (!FilteredTools.Any())
+    {
+        <section class="empty-state" aria-live="polite">
+            <h2>No matching tools</h2>
+            <p class="muted">Try another search term.</p>
+        </section>
+    }
+    else
+    {
+        @foreach (var category in FilteredTools.GroupBy(tool => tool.Category)
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            <section class="tool-category" aria-label="@category.Key tools">
+                <h2 class="category-title">@category.Key</h2>
+                <div class="grid launcher-grid">
+                    @foreach (var tool in category)
+                    {
+                        <NavLink class="card link-card tool-card" href="@tool.Route">
+                            <span class="tool-icon" aria-hidden="true">@tool.IconText</span>
+                            <span class="tool-card-content">
+                                <span class="tool-card-title">@tool.Title</span>
+                                <span class="tool-card-description">@tool.Description</span>
+                            </span>
+                            <span class="tool-card-arrow" aria-hidden="true">→</span>
+                        </NavLink>
+                    }
+                </div>
+            </section>
+        }
+    }
 </div>
 
 @code {
     private string _displayName = string.Empty;
+    private string _search = string.Empty;
     private IReadOnlyList<string> _permissions = Array.Empty<string>();
+    private IReadOnlyList<PortalToolOptions> _tools = Array.Empty<PortalToolOptions>();
+
+    private IEnumerable<PortalToolOptions> FilteredTools =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _tools
+            : _tools.Where(tool =>
+                tool.Title.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                tool.Description.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                tool.Category.Contains(_search, StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
         _displayName = await UserContext.GetDisplayNameAsync();
         _permissions = await UserContext.GetPermissionsAsync();
+        _tools = Catalog.Tools
+            .Where(tool =>
+                string.IsNullOrWhiteSpace(tool.RequiredPermission) ||
+                _permissions.Contains(tool.RequiredPermission, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(tool => tool.Category, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(tool => tool.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }

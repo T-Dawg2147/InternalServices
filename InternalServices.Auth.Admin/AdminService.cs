@@ -201,7 +201,7 @@ internal sealed class AdminService : IAdminService
         {
             var before = await CountAdminAccessAsync(conn, userId, -1, -1, ct);
             var after = await CountAdminAccessAsync(conn, userId, roleId, null, ct);
-            if (before > 0 && after == 0)
+            if (AdminAccessGuard.WouldRemoveLastAdminAccess(before, after))
                 throw new InvalidOperationException("You can't remove the role that gives you Admin access.");
         }
         
@@ -240,7 +240,7 @@ internal sealed class AdminService : IAdminService
         {
             var before = await CountAdminAccessAsync(conn, actor, -1, -1, ct);
             var after = await CountAdminAccessAsync(conn, actor, roleId, permissionId, ct);
-            if (before > 0 && after == 0)
+            if (AdminAccessGuard.WouldRemoveLastAdminAccess(before, after))
                 throw new InvalidOperationException("You can't revoke the permission that gives you Admin access.");
         }
         
@@ -334,7 +334,7 @@ internal sealed class AdminService : IAdminService
             afterChangeParameters,
             cancellationToken: ct));
 
-        if (before > 0 && after == 0)
+        if (AdminAccessGuard.WouldRemoveLastAdminAccess(before, after))
         {
             throw new InvalidOperationException(
                 "This change would remove the last active user with Admin access to this tool.");
